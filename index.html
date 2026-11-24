@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Catalina · Asesora de proyectos</title>
+<meta name="description" content="Prototipo académico de un asesor de proyectos con IA para mejoramiento del hogar: habla o escribe y arma tu proyecto.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: una columna de lectura; dos paneles lado a lado (voz / chat) que se apilan en el teléfono */
+:root {
+  --bg: #f5f4f0; --surface: #ffffff; --ink: #1c1d1a; --muted: #5e605a; --line: #e2e0d8;
+  --accent: #0f6e5c; --accent-ink: #ffffff; --accent-soft: #e3f1ec; --user: #1c1d1a; --user-ink: #ffffff;
+  --warn: #9a4a12;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Inter", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #131412; --surface: #1c1d1b; --ink: #eeeee8; --muted: #a3a59d; --line: #2e302c;
+          --accent: #3fb79d; --accent-ink: #0b1a16; --accent-soft: #17302a; --user: #eeeee8; --user-ink: #131412;
+          --warn: #e0a06a; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--body);
+       padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1040px; margin: 0 auto; padding-block: 40px 32px; display: grid; gap: 28px; }
+header { display: grid; gap: 10px; max-width: 680px; }
+.eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+h1 { font: 700 clamp(30px, 5vw, 44px)/1.08 var(--display); margin: 0; text-wrap: balance; }
+.lead { margin: 0; color: var(--muted); font-size: 16px; }
+.aviso { margin: 0; font-size: 13px; color: var(--warn); }
+.panels { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 20px; align-items: start; }
+@media (max-width: 820px) { .panels { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px; display: grid; gap: 14px; min-width: 0; }
+.panel h2 { font: 600 20px/1.2 var(--display); margin: 0; }
+.panel p { margin: 0; color: var(--muted); }
+.mic { display: flex; align-items: center; gap: 14px; }
+.btn-voz { width: 72px; height: 72px; border-radius: 50%; border: 0; background: var(--accent); color: var(--accent-ink);
+           display: grid; place-items: center; cursor: pointer; flex: none; transition: transform .15s; }
+.btn-voz:hover { transform: scale(1.04); }
+.btn-voz:focus-visible, button:focus-visible, input:focus-visible, .chip:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.btn-voz[data-estado="activa"] { background: #b3261e; color: #fff; }
+.btn-voz svg { width: 30px; height: 30px; }
+.estado { font-weight: 600; }
+.estado small { display: block; font-weight: 400; color: var(--muted); }
+.nivel { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.nivel span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .1s; }
+.transcripcion { border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 8px; max-height: 260px; overflow-y: auto; font-size: 14px; }
+.transcripcion:empty::before { content: "Aquí verás la transcripción de la llamada."; color: var(--muted); }
+.t-linea b { font-weight: 600; }
+.chat { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; gap: 12px; }
+.mensajes { min-height: 320px; max-height: 460px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px; }
+.msg { max-width: 86%; padding: 10px 14px; border-radius: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg.bot { background: var(--accent-soft); align-self: flex-start; border-bottom-left-radius: 4px; }
+.msg.yo { background: var(--user); color: var(--user-ink); align-self: flex-end; border-bottom-right-radius: 4px; }
+.msg a { color: inherit; font-weight: 600; }
+.msg.pensando { color: var(--muted); font-style: italic; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 999px; padding: 7px 12px; font: 500 13px var(--body); cursor: pointer; }
+.chip:hover { border-color: var(--accent); }
+form { display: flex; gap: 8px; }
+input[type="text"] { flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 12px; padding: 12px 14px; font: 15px var(--body); }
+.btn-enviar { border: 0; border-radius: 12px; background: var(--accent); color: var(--accent-ink); padding: 0 18px; font: 600 15px var(--body); cursor: pointer; }
+.btn-enviar:disabled { opacity: .5; cursor: default; }
+.como { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 720px) { .como { grid-template-columns: minmax(0, 1fr); } }
+.como div { display: grid; gap: 4px; }
+.como b { font: 600 15px var(--display); }
+.como span { color: var(--muted); font-size: 14px; }
+footer { font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Prototipo · Asesor de proyectos con IA</p>
+    <h1>Habla con Catalina, tu asesora de proyectos para el hogar</h1>
+    <p class="lead">Cuéntale qué quieres hacer, por ejemplo pintar una pieza con hongos o poner un filtro a la piscina. Te pregunta lo necesario, calcula cantidades, te muestra productos con precio y te recuerda lo que falta.</p>
+    <p class="aviso">Prototipo académico. No es un canal oficial de Easy ni de Cencosud: los precios son referenciales y no se toman pedidos.</p>
+  </header>
+
+  <section class="panels">
+    <article class="panel" aria-labelledby="t-voz">
+      <h2 id="t-voz">Por voz</h2>
+      <p>Aprieta el botón, permite el micrófono y habla normalmente. Para terminar, apriétalo de nuevo.</p>
+      <div class="mic">
+        <button class="btn-voz" id="btn-voz" type="button" aria-label="Iniciar llamada con Catalina" data-estado="lista">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v5"/></svg>
+        </button>
+        <div class="estado" id="estado-voz" aria-live="polite">Lista para hablar<small>Usa audífonos si estás en un lugar con ruido</small></div>
+      </div>
+      <div class="nivel" aria-hidden="true"><span id="nivel"></span></div>
+      <div class="transcripcion" id="transcripcion" aria-live="polite"></div>
+    </article>
+
+    <article class="panel chat" aria-labelledby="t-chat">
+      <h2 id="t-chat">Por escrito</h2>
+      <div class="mensajes" id="mensajes" aria-live="polite">
+        <div class="msg bot">¡Hola! Soy Catalina 🛠️ Cuéntame qué proyecto tienes en mente y te ayudo a armar tu lista de compra.</div>
+      </div>
+      <div class="chips" id="chips">
+        <button class="chip" type="button">Quiero pintar mi pieza, tiene hongos</button>
+        <button class="chip" type="button">Necesito un filtro para mi piscina</button>
+        <button class="chip" type="button">Quiero pintar la reja, está oxidada</button>
+        <button class="chip" type="button">¿Cuánto vale un saco de cemento?</button>
+      </div>
+      <form id="form-chat" autocomplete="off">
+        <label for="entrada" hidden>Tu mensaje</label>
+        <input type="text" id="entrada" placeholder="Escribe tu mensaje…" maxlength="1000">
+        <button class="btn-enviar" id="btn-enviar" type="submit">Enviar</button>
+      </form>
+    </article>
+  </section>
+
+  <section class="como" aria-label="Cómo funciona">
+    <div><b>1. Diagnostica</b><span>Pregunta para qué es la compra, la superficie, el estado y las medidas.</span></div>
+    <div><b>2. Recomienda</b><span>Muestra productos reales con precio en niveles: económico, recomendado y premium.</span></div>
+    <div><b>3. Completa</b><span>Calcula cantidades, recuerda lo que falta y arma tu proyecto listo para comprar.</span></div>
+  </section>
+
+  <footer>Prototipo académico de un asesor de proyectos con IA para mejoramiento del hogar. Precios referenciales tomados de easy.cl en noviembre de 2026. No es un canal oficial de Easy ni de Cencosud.</footer>
+</div>
+
+<script type="module">
+import Vapi from "https://cdn.jsdelivr.net/npm/@vapi-ai/web@2.7.1/+esm";
+
+const PUBLIC_KEY = "4224c4c8-f2f8-4162-84b9-40574d880fea";
+const ASISTENTE_VOZ = "64dbdfad-ea5b-4a03-a275-a0bfae9257e8";
+const URL_CHAT = "https://smallhouselaw.app.n8n.cloud/webhook/easy-demo-chat";
+
+/* ---------- Voz ---------- */
+const btnVoz = document.getElementById("btn-voz");
+const estadoVoz = document.getElementById("estado-voz");
+const nivel = document.getElementById("nivel");
+const transcripcion = document.getElementById("transcripcion");
+let vapi = null, enLlamada = false;
+
+function setEstado(titulo, detalle) {
+  estadoVoz.textContent = titulo;
+  if (detalle) { const s = document.createElement("small"); s.textContent = detalle; estadoVoz.appendChild(s); }
+}
+function lineaTranscripcion(rol, texto) {
+  const p = document.createElement("div");
+  p.className = "t-linea";
+  const b = document.createElement("b");
+  b.textContent = rol === "user" ? "Tú: " : "Catalina: ";
+  p.append(b, document.createTextNode(texto));
+  transcripcion.appendChild(p);
+  transcripcion.scrollTop = transcripcion.scrollHeight;
+}
+function iniciarVapi() {
+  if (vapi) return vapi;
+  vapi = new Vapi(PUBLIC_KEY);
+  vapi.on("call-start", () => { enLlamada = true; btnVoz.dataset.estado = "activa";
+    btnVoz.setAttribute("aria-label", "Terminar llamada"); setEstado("En llamada", "Habla cuando quieras"); });
+  vapi.on("call-end", () => { enLlamada = false; btnVoz.dataset.estado = "lista"; nivel.style.width = "0";
+    btnVoz.setAttribute("aria-label", "Iniciar llamada con Catalina"); setEstado("Llamada terminada", "Aprieta el botón para hablar de nuevo"); });
+  vapi.on("speech-start", () => setEstado("Catalina está hablando"));
+  vapi.on("speech-end", () => setEstado("Te escucho"));
+  vapi.on("volume-level", v => { nivel.style.width = Math.min(100, Math.round(v * 100)) + "%"; });
+  vapi.on("message", m => { if (m && m.type === "transcript" && m.transcriptType === "final") lineaTranscripcion(m.role, m.transcript); });
+  vapi.on("error", e => { console.error(e); enLlamada = false; btnVoz.dataset.estado = "lista";
+    setEstado("No se pudo conectar", "Revisa que el navegador tenga permiso de micrófono e inténtalo de nuevo"); });
+  return vapi;
+}
+btnVoz.addEventListener("click", async () => {
+  try {
+    const v = iniciarVapi();
+    if (enLlamada) { v.stop(); return; }
+    transcripcion.textContent = "";
+    setEstado("Conectando…", "Permite el micrófono si el navegador lo pide");
+    await v.start(ASISTENTE_VOZ);
+  } catch (e) {
+    console.error(e);
+    setEstado("No se pudo iniciar la llamada", "Revisa el permiso de micrófono e inténtalo de nuevo");
+  }
+});
+
+/* ---------- Chat ---------- */
+const mensajes = document.getElementById("mensajes");
+const form = document.getElementById("form-chat");
+const entrada = document.getElementById("entrada");
+const btnEnviar = document.getElementById("btn-enviar");
+let chatId = null;
+try { chatId = sessionStorage.getItem("catalina-chat") || null; } catch (e) {}
+
+function escapar(s) { return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function formatear(texto) {
+  let h = escapar(texto);
+  h = h.replace(/https:\/\/[^\s<]+/g, u => { const limpio = u.replace(/[.,)]+$/, ""); const resto = u.slice(limpio.length);
+    return `<a href="${limpio}" target="_blank" rel="noopener">${limpio.includes("easy-proyecto") ? "Ver tu proyecto" : limpio}</a>${resto}`; });
+  h = h.replace(/\*([^*\n]+)\*/g, "<strong>$1</strong>");
+  return h;
+}
+function agregar(clase, texto) {
+  const d = document.createElement("div");
+  d.className = "msg " + clase;
+  if (clase === "bot") d.innerHTML = formatear(texto); else d.textContent = texto;
+  mensajes.appendChild(d);
+  mensajes.scrollTop = mensajes.scrollHeight;
+  return d;
+}
+async function enviar(texto) {
+  texto = texto.trim();
+  if (!texto) return;
+  agregar("yo", texto);
+  entrada.value = "";
+  btnEnviar.disabled = true;
+  const pensando = agregar("bot pensando", "Catalina está escribiendo…");
+  try {
+    const r = await fetch(URL_CHAT, { method: "POST", headers: { "Content-Type": "text/plain" },
+                                      body: JSON.stringify({ texto, chatId }) });
+    const d = await r.json();
+    pensando.remove();
+    if (d.chatId) { chatId = d.chatId; try { sessionStorage.setItem("catalina-chat", chatId); } catch (e) {} }
+    agregar("bot", d.texto || "No recibí respuesta. ¿Me lo repites?");
+  } catch (e) {
+    pensando.remove();
+    agregar("bot", "No pude conectarme. Revisa tu internet e inténtalo de nuevo.");
+  } finally {
+    btnEnviar.disabled = false;
+    entrada.focus();
+  }
+}
+form.addEventListener("submit", e => { e.preventDefault(); enviar(entrada.value); });
+document.querySelectorAll(".chip").forEach(b => b.addEventListener("click", () => enviar(b.textContent)));
+</script>
+</body>
+</html>
