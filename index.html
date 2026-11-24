@@ -126,7 +126,9 @@ footer { font-size: 12px; color: var(--muted); border-top: 1px solid var(--line)
 </div>
 
 <script type="module">
-import Vapi from "https://cdn.jsdelivr.net/npm/@vapi-ai/web@2.7.1/+esm";
+import VapiModulo from "https://cdn.jsdelivr.net/npm/@vapi-ai/web@2.7.1/+esm";
+// El paquete viene empaquetado como CommonJS: la clase queda en .default
+const Vapi = typeof VapiModulo === "function" ? VapiModulo : VapiModulo.default;
 
 const PUBLIC_KEY = "4224c4c8-f2f8-4162-84b9-40574d880fea";
 const ASISTENTE_VOZ = "64dbdfad-ea5b-4a03-a275-a0bfae9257e8";
